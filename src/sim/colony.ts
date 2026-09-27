@@ -464,3 +464,23 @@ function colonyEvents(c: ColonyState, rng: RNG, rep: ColonyReport, wallet: Walle
 export function colonyScore(c: ColonyState): number {
   return Math.round(c.pop * 2 + c.buildings.length * 50 + c.techs.length * 200 + c.happiness * 10);
 }
+
+/** Prefabricated structures delivered by a Colony Pod in the campaign. */
+export function addStarterKit(c: ColonyState, ids: string[] = ['solar', 'farm', 'water', 'habitat']): void {
+  const mid = Math.floor(c.size / 2);
+  for (const id of ids) {
+    const def = BUILDING_MAP[id];
+    let best: [number, number] | null = null, bd = 1e9;
+    for (let y = mid - 3; y <= mid + 3; y++)
+      for (let x = mid - 3; x <= mid + 3; x++) {
+        const t = tileAt(c, x, y);
+        if (!t || !TILE_INFO[t].buildable || buildingAt(c, x, y)) continue;
+        if (def.requiresTile && !def.requiresTile.includes(t)) continue;
+        let d = Math.abs(x - mid) + Math.abs(y - mid);
+        if (def.bonusTile && def.bonusTile.tile === t) d -= 2;
+        if (d < bd) { bd = d; best = [x, y]; }
+      }
+    if (best) c.buildings.push({ id, x: best[0], y: best[1], hp: 1, progress: 1, enabled: true, staff: 1 });
+  }
+  c.report = computeReport(c);
+}

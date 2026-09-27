@@ -11,7 +11,7 @@ import { h, clear, toast, openModal, bar, add, fmtCr } from '../ui/dom';
 import { input } from '../input/input';
 import { computeStats } from '../ship/design';
 import { MODULE_MAP } from '../data/modules';
-import { createColony } from '../sim/colony';
+import { createColony, addStarterKit } from '../sim/colony';
 import { advanceTime } from '../sim/simulation';
 import { addXp } from '../player/player';
 import { drawStar } from '../render/sprites';
@@ -154,6 +154,7 @@ export class PlanetScene implements Scene {
     c.founded = Math.floor(w.day);
     c.day = 0;
     c.credits = 0;
+    addStarterKit(c);
     w.colonies.push(c);
     st.colony = c.id;
     st.owner = 0;

@@ -8,6 +8,7 @@ import { changeRep, addXp, addMerit, cargoUsed, playerStats } from '../player/pl
 import { bus } from '../core/events';
 import { allBodies } from '../gen/system';
 import { RANKS } from '../data/factions';
+import type { ShipClass } from '../ship/design';
 
 function mk(partial: Partial<Mission> & Pick<Mission, 'id' | 'type' | 'title' | 'desc' | 'faction' | 'origin' | 'target' | 'reward'>): Mission {
   return {
@@ -232,8 +233,11 @@ export function acceptMission(w: World, m: Mission): string | null {
     const fl = w.spawnFleet(m.enemy, m.type === 'bounty' ? 'bounty' : 'war', m.target);
     const lvl = m.data.level ?? 1;
     if (m.type === 'bounty') {
-      const extra = w.composition(w.factions[m.enemy], 'bounty', lvl);
-      fl.ships = fl.ships.slice(0, 1 + lvl).concat(lvl >= 3 ? extra.slice(0, 1) : []);
+      const tiers: ShipClass[][] = [['corvette', 'fighter'], ['frigate', 'corvette', 'fighter'], ['destroyer', 'frigate', 'fighter', 'fighter']];
+      fl.ships = tiers[Math.min(2, lvl - 1)].map((cls, i) => ({ cls, v: i % 2, hp: 1 }));
+    } else {
+      const tiers: ShipClass[][] = [['frigate', 'corvette', 'fighter'], ['destroyer', 'frigate', 'corvette', 'fighter'], ['cruiser', 'destroyer', 'frigate', 'fighter', 'fighter'], ['cruiser', 'destroyer', 'destroyer', 'frigate', 'corvette', 'fighter']];
+      fl.ships = tiers[Math.min(3, Math.max(0, lvl - 1))].map((cls, i) => ({ cls, v: i % 2, hp: 1 }));
     }
     fl.mission = m.id;
     fl.wait = 999;

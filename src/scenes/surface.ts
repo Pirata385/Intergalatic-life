@@ -137,74 +137,94 @@ export class SurfaceScene implements Scene {
     return KIND_LIST[c.kinds[ly * CHUNK + lx]];
   }
 
+  /** Base layer: one pixel per tile (with margin) drawn with bilinear smoothing. */
   private chunkCanvas(c: ChunkData): HTMLCanvasElement {
     if (c.canvas) return c.canvas;
-    const S = CHUNK, M = S + 2;
+    const S = CHUNK, G = S + 2, M = S + 4;
     const cv = document.createElement('canvas');
-    cv.width = cv.height = S * TPX;
+    cv.width = cv.height = G;
     const g = cv.getContext('2d')!;
-    const img = g.createImageData(S * TPX, S * TPX);
+    const img = g.createImageData(G, G);
     const d = img.data;
-    const rng = new RNG(hash(c.cx, c.cy, 5));
     const lx = this.lightX, ly = this.lightY;
-    for (let ty = 0; ty < S; ty++)
-      for (let tx = 0; tx < S; tx++) {
+    for (let ty = 0; ty < G; ty++)
+      for (let tx = 0; tx < G; tx++) {
         const hi = (ty + 1) * M + tx + 1;
         const dx = c.heights[hi + 1] - c.heights[hi - 1];
         const dy = c.heights[hi + M] - c.heights[hi - M];
-        const kind = KIND_LIST[c.kinds[ty * S + tx]];
-        const flat = kind === 'water' || kind === 'deepwater' || kind === 'lava';
-        let shade = flat ? 1 : clamp(1 - (dx * lx + dy * ly) * 9, 0.45, 1.5);
-        // cast-ish shadow from higher neighbour toward light
-        const up = c.heights[hi - Math.round(ly) * M - Math.round(lx)];
-        if (!flat && up - c.heights[hi] > 0.03) shade *= 0.8;
-        const o = (ty * S + tx) * 3;
-        const r0 = c.rgb[o], g0 = c.rgb[o + 1], b0 = c.rgb[o + 2];
-        for (let py = 0; py < TPX; py++)
-          for (let px = 0; px < TPX; px++) {
-            const n = 1 + (rng.next() - 0.5) * (flat ? 0.05 : 0.12);
-            const k = shade * n;
-            const i = ((ty * TPX + py) * S * TPX + tx * TPX + px) * 4;
-            d[i] = r0 * k; d[i + 1] = g0 * k; d[i + 2] = b0 * k; d[i + 3] = 255;
-          }
+        const water = c.heights[hi] < this.gen.field.pal.seaLevel;
+        const shade = water ? 1 : clamp(1 - (dx * lx + dy * ly) * 7, 0.55, 1.4);
+        const o = (ty * G + tx) * 4, q = (ty * G + tx) * 3;
+        d[o] = c.rgbM[q] * shade; d[o + 1] = c.rgbM[q + 1] * shade; d[o + 2] = c.rgbM[q + 2] * shade; d[o + 3] = 255;
       }
     g.putImageData(img, 0, 0);
-    // decorations: trees, rocks, crystals
+    c.canvas = cv;
+    return cv;
+  }
+
+  /** Detail layer: dithering, vegetation, rocks and crystals at full resolution. */
+  private chunkDetail(c: ChunkData): HTMLCanvasElement {
+    if (c.detail) return c.detail;
+    const S = CHUNK;
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = S * TPX;
+    const g = cv.getContext('2d')!;
+    const lx = this.lightX, ly = this.lightY;
+    const rng = new RNG(hash(c.cx, c.cy, 5));
+    // fine grain so the ground doesn't look like plastic
+    for (let i = 0; i < S * S * 1.5; i++) {
+      const x = rng.range(0, S * TPX), y = rng.range(0, S * TPX);
+      const kind = KIND_LIST[c.kinds[Math.floor(y / TPX) * S + Math.floor(x / TPX)]];
+      if (kind === 'water' || kind === 'deepwater' || kind === 'lava') continue;
+      g.fillStyle = rng.chance(0.5) ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.08)';
+      g.fillRect(x, y, rng.range(1, 2.5), rng.range(1, 2.5));
+    }
     const rng2 = new RNG(hash(c.cx, c.cy, 9));
-    for (let i = 0; i < S * S * 0.08; i++) {
+    for (let i = 0; i < S * S * 0.09; i++) {
       const tx = rng2.int(0, S - 1), ty = rng2.int(0, S - 1);
       const kind = KIND_LIST[c.kinds[ty * S + tx]];
       const x = tx * TPX + rng2.range(0, TPX), y = ty * TPX + rng2.range(0, TPX);
       if (kind === 'forest') {
         g.fillStyle = 'rgba(0,0,0,0.3)';
         g.beginPath();
-        g.ellipse(x + lx * -3, y + ly * -3, 4, 3, 0, 0, 6.28);
+        g.ellipse(x - lx * 3, y - ly * 3, 4, 3, 0, 0, 6.28);
         g.fill();
         g.fillStyle = `rgb(${30 + rng2.int(0, 30)},${80 + rng2.int(0, 50)},${30 + rng2.int(0, 20)})`;
         g.beginPath();
         g.arc(x, y, rng2.range(2.5, 4.5), 0, 6.28);
         g.fill();
-      } else if (kind === 'rock' || kind === 'sand' || kind === 'mountain') {
-        if (rng2.chance(0.4)) {
-          g.fillStyle = 'rgba(0,0,0,0.25)';
-          g.fillRect(x - lx * 2, y - ly * 2, 3, 2);
-          g.fillStyle = 'rgba(200,190,170,0.35)';
-          g.fillRect(x, y, 2, 2);
+        g.fillStyle = 'rgba(255,255,255,0.12)';
+        g.beginPath();
+        g.arc(x + lx * 1.2, y + ly * 1.2, 1.4, 0, 6.28);
+        g.fill();
+      } else if (kind === 'rock' || kind === 'sand' || kind === 'mountain' || kind === 'ice') {
+        if (rng2.chance(kind === 'mountain' ? 0.7 : 0.35)) {
+          const r = rng2.range(1, kind === 'mountain' ? 3.5 : 2.2);
+          g.fillStyle = 'rgba(0,0,0,0.28)';
+          g.beginPath(); g.arc(x - lx * r, y - ly * r, r, 0, 6.28); g.fill();
+          g.fillStyle = kind === 'ice' ? 'rgba(255,255,255,0.5)' : 'rgba(210,200,180,0.4)';
+          g.beginPath(); g.arc(x, y, r, 0, 6.28); g.fill();
         }
       } else if (kind === 'crystal') {
-        g.fillStyle = 'rgba(200,170,255,0.8)';
+        g.fillStyle = 'rgba(200,170,255,0.85)';
         g.beginPath();
         g.moveTo(x, y - 4);
         g.lineTo(x + 2, y);
         g.lineTo(x, y + 2);
         g.lineTo(x - 2, y);
         g.fill();
-      } else if (kind === 'grass' && rng2.chance(0.3)) {
-        g.fillStyle = 'rgba(120,180,80,0.5)';
+      } else if (kind === 'grass' && rng2.chance(0.4)) {
+        g.fillStyle = 'rgba(120,180,80,0.45)';
         g.fillRect(x, y, 1, 3);
+      } else if ((kind === 'water' || kind === 'deepwater') && rng2.chance(0.25)) {
+        g.strokeStyle = 'rgba(255,255,255,0.12)';
+        g.beginPath(); g.moveTo(x - 3, y); g.lineTo(x + 3, y); g.stroke();
+      } else if (kind === 'lava' && rng2.chance(0.5)) {
+        g.fillStyle = 'rgba(255,200,80,0.6)';
+        g.beginPath(); g.arc(x, y, rng2.range(0.8, 2), 0, 6.28); g.fill();
       }
     }
-    c.canvas = cv;
+    c.detail = cv;
     return cv;
   }
 
@@ -594,15 +614,18 @@ export class SurfaceScene implements Scene {
     const s = TPX * this.zoom;
     const [wx0, wy0] = this.toWorld(0, 0);
     const [wx1, wy1] = this.toWorld(W, H);
-    g.imageSmoothingEnabled = false;
+    g.imageSmoothingEnabled = true;
     for (let cy = Math.floor(wy0 / CHUNK); cy <= Math.floor(wy1 / CHUNK); cy++)
       for (let cx = Math.floor(wx0 / CHUNK); cx <= Math.floor(wx1 / CHUNK); cx++) {
         const c = this.chunks.get(cx + ',' + cy);
         if (!c) continue;
-        const [sx, sy] = this.toScreen(cx * CHUNK, cy * CHUNK);
-        g.drawImage(this.chunkCanvas(c), Math.floor(sx), Math.floor(sy), Math.ceil(CHUNK * s) + 1, Math.ceil(CHUNK * s) + 1);
+        const [sx, sy] = this.toScreen(cx * CHUNK - 0.5, cy * CHUNK - 0.5);
+        const size = CHUNK * s;
+        // sample tile centres so bilinear filtering blends across chunk borders using the margin
+        g.drawImage(this.chunkCanvas(c), 0.5, 0.5, CHUNK + 1, CHUNK + 1, sx, sy, size + s, size + s);
+        const [dx, dy] = this.toScreen(cx * CHUNK, cy * CHUNK);
+        g.drawImage(this.chunkDetail(c), dx, dy, size, size);
       }
-    g.imageSmoothingEnabled = true;
     // water shimmer
     // lander
     {

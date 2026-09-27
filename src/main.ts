@@ -9,6 +9,7 @@ import { SurfaceScene } from './scenes/surface';
 import { BuilderScene } from './scenes/builder';
 import { ColonyScene } from './scenes/colony';
 import { ArenaScene } from './scenes/arena';
+import { renderShipSprite } from './ship/render';
 
 function boot(): void {
   const app = document.getElementById('app')!;
@@ -37,7 +38,9 @@ function boot(): void {
   game.register('colony', (opts) => new ColonyScene(game, opts ?? {}));
   game.register('arena', (opts) => new ArenaScene(game, opts));
 
+  // debugging / automated test hooks
   (window as any).__game = game;
+  (window as any).__renderShip = (d: any) => renderShipSprite(d, { barrels: true });
   game.go('menu');
   game.start();
 }

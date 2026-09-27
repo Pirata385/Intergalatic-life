@@ -372,6 +372,21 @@ function finalize(b: Builder, style: ShipStyle, kit: Kit, cls: ShipClass, fill: 
         }
         mods.push({ id, x, y, r });
       }
+    // faction livery: accent stripes / secondary panels on structural blocks
+    if (style.species === 'human') {
+      const pattern = Math.abs(style.seed) % 4;
+      const midY = (H - 1) / 2;
+      for (const m of mods) {
+        const def = MODULE_MAP[m.id];
+        if (def.cat !== 'armor') continue;
+        const dy = Math.abs(m.y - midY);
+        if (pattern === 0 && Math.abs(dy - Math.floor(H / 4)) < 0.6) m.p = 2;
+        else if (pattern === 1 && (m.x + Math.floor(dy)) % 7 === 0) m.p = 2;
+        else if (pattern === 2 && m.x > W * 0.7 && dy < 1.6) m.p = 2;
+        else if (pattern === 3 && dy >= H / 2 - 1.5) m.p = 1;
+        if (style.family === 'pirate' && b.rng.chance(0.12)) m.p = 1;
+      }
+    }
     // navigation lights on the extreme tips
     for (const m of mods) {
       if (m.id === kit.slope && (m.x === W - 1 || m.x === 0) && b.rng.chance(0.3) && style.species === 'human') m.id = 'light';

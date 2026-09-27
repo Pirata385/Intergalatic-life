@@ -27,11 +27,13 @@ export interface SurfaceEntity {
 export interface ChunkData {
   cx: number;
   cy: number;
-  heights: Float32Array; // (CHUNK+2)^2 with 1 tile margin
+  heights: Float32Array; // (CHUNK+4)^2 with a 2 tile margin
   kinds: Uint8Array; // CHUNK^2
   rgb: Uint8ClampedArray; // CHUNK^2 * 3 base colours
+  rgbM: Uint8ClampedArray; // (CHUNK+2)^2 * 3 colours including a 1 tile margin (for seamless smoothing)
   entities: SurfaceEntity[];
   canvas?: HTMLCanvasElement;
+  detail?: HTMLCanvasElement;
 }
 
 export const KIND_LIST: SurfaceKind[] = ['water', 'deepwater', 'lava', 'ice', 'sand', 'rock', 'grass', 'forest', 'mountain', 'crystal', 'toxic'];
@@ -91,7 +93,7 @@ export class SurfaceGen {
 
   generateChunk(cx: number, cy: number): ChunkData {
     const S = CHUNK;
-    const M = S + 2;
+    const M = S + 4;
     const heights = new Float32Array(M * M);
     const moist = new Float32Array(M * M);
     const lats = new Float32Array(M * M);
@@ -99,7 +101,7 @@ export class SurfaceGen {
     const step = 8;
     const L = Math.ceil(M / step) + 1;
     const mh = new Float32Array(L * L), mm = new Float32Array(L * L), ml = new Float32Array(L * L);
-    const u0 = cx * S - 1, v0 = cy * S - 1;
+    const u0 = cx * S - 2, v0 = cy * S - 2;
     for (let j = 0; j < L; j++)
       for (let i = 0; i < L; i++) {
         const [h, m, lat] = this.macro(u0 + i * step, v0 + j * step);
@@ -129,7 +131,7 @@ export class SurfaceGen {
     const type = this.body.type;
     for (let j = 0; j < S; j++)
       for (let i = 0; i < S; i++) {
-        const hi = (j + 1) * M + (i + 1);
+        const hi = (j + 2) * M + (i + 2);
         const h = heights[hi];
         const m = moist[hi];
         const lat = lats[hi];
@@ -154,8 +156,19 @@ export class SurfaceGen {
         rgb[o] = col[0]; rgb[o + 1] = col[1]; rgb[o + 2] = col[2];
       }
 
+    // colours for the full margin grid, used by the smoothed base layer
+    const G = S + 2;
+    const rgbM = new Uint8ClampedArray(G * G * 3);
+    for (let j = 0; j < G; j++)
+      for (let i = 0; i < G; i++) {
+        const hi = (j + 1) * M + (i + 1);
+        const d = n.noise2((cx * S + i - 1) * 0.3, (cy * S + j - 1) * 0.3);
+        surfaceColor(type, pal, heights[hi], moist[hi], lats[hi], d * 0.4, col);
+        const o = (j * G + i) * 3;
+        rgbM[o] = col[0]; rgbM[o + 1] = col[1]; rgbM[o + 2] = col[2];
+      }
     const entities = this.spawnEntities(cx, cy, kinds);
-    return { cx, cy, heights, kinds, rgb, entities };
+    return { cx, cy, heights, kinds, rgb, rgbM, entities };
   }
 
   private spawnEntities(cx: number, cy: number, kinds: Uint8Array): SurfaceEntity[] {
