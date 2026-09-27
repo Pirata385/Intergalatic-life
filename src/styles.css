@@ -115,6 +115,17 @@ input[type='text'], input[type='number'], select {
   -webkit-user-select: text;
   user-select: text;
 }
+textarea {
+  font: 0.8em var(--mono);
+  color: var(--text);
+  background: rgba(8, 14, 28, 0.9);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.5em;
+  -webkit-user-select: text;
+  user-select: text;
+  resize: vertical;
+}
 input[type='range'] { width: 100%; accent-color: var(--accent); }
 
 .row { display: flex; gap: 0.5em; align-items: center; flex-wrap: wrap; }
