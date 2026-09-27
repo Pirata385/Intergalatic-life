@@ -6,6 +6,7 @@ import type { Body } from '../gen/system';
 import { PLANET_LABEL, bodyPos } from '../gen/system';
 import { generatePlanetTexture, PlanetTexture, PlanetField } from '../gen/planet';
 import { planetGL } from '../render/planetgl';
+import { requestPlanetTexture } from '../render/texworker';
 import { renderSphere } from '../render/planetcpu';
 import { h, clear, toast, openModal, bar, add, fmtCr } from '../ui/dom';
 import { input } from '../input/input';
@@ -44,8 +45,14 @@ export class PlanetScene implements Scene {
     const st = this.w.systems[this.w.player.sys];
     const inhabited = st.pop > 50 && this.body.habitability > 0.4 && !this.body.parent ? 1 : 0;
     setTimeout(() => {
-      this.tex = generatePlanetTexture(this.body, planetGL().ok ? 512 : 256, inhabited);
+      this.tex = generatePlanetTexture(this.body, 256, inhabited);
       if (planetGL().ok) planetGL().setTexture(this.tex);
+      const hi = planetGL().ok ? (this.game.settings.quality === 'high' ? 1024 : 512) : 0;
+      if (hi) requestPlanetTexture(this.body, hi, inhabited).then((t) => {
+        if (this.game.scene !== this) return;
+        this.tex = t;
+        planetGL().setTexture(t);
+      });
     }, 20);
     this.buildHud();
   }

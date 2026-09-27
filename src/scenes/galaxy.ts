@@ -196,6 +196,16 @@ export class GalaxyScene implements Scene {
       st.visited && st.stock ? this.marketPreview(this.selected) : st.station ? h('div', { class: 'tiny muted' }, 'Visit to record market prices.') : null,
       s.planets.length && st.visited ? h('div', { class: 'tiny muted' }, s.planets.map((pl) => `${pl.name}: ${PLANET_LABEL[pl.type]}`).join(' · ')) : null,
       routeInfo,
+      p.fuel < 12 && this.selected === p.sys ? h('div', { class: 'card small' }, h('div', { class: 'warn' }, 'Fuel critically low.'),
+        h('button', { class: `btn small ${p.credits < 1500 ? 'disabled' : ''}`, onclick: () => {
+          p.credits -= 1500;
+          p.fuel += 25;
+          advanceTime(w, 3, p.sys);
+          this.fuel = p.fuel;
+          toast('A fuel tender arrives after three days: +25 fuel.', 'good');
+          this.buildHud();
+          this.select(this.selected);
+        } }, 'Call emergency fuel tender (1,500 cr, 3 days)')) : null,
       h('div', { class: 'row' },
         this.route && this.selected !== p.sys ? h('button', { class: `btn primary ${fuelForJump(sysDist(w.sysData[p.sys], w.sysData[this.route[1]])) > p.fuel ? 'disabled' : ''}`, onclick: () => this.jump() }, `⤳ Jump${this.route.length > 2 ? ' (next hop: ' + w.sysData[this.route[1]].name + ')' : ''}`) : null,
         this.route && this.route.length > 2 ? h('button', { class: 'btn', onclick: () => { (this.game as any).galaxyRoute = this.route; toast('Course plotted. Use "Continue route" in flight.', 'good'); } }, 'Plot course') : null),

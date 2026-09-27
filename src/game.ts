@@ -193,6 +193,7 @@ export class Game {
       this.fps = this.fps * 0.95 + (1 / dt) * 0.05;
       try {
         if (input.hit('Escape')) this.handleBack();
+        this.planets.budget = 1;
         if (this.scene && !this.paused) this.scene.update(dt);
         if (this.scene) {
           const g = this.g;

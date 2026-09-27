@@ -123,12 +123,12 @@ export class SystemScene implements Scene {
       this.cw.stations = [];
       this.makeStations();
       this.rebuildPlayerShip();
-    }
+      this.syncFleets();
+    } else if (this.initialized && o.arrive === 'resume') this.syncFleets();
     this.buildHud();
     this.onResize();
-    if (o.docked && this.dockStation) this.openStationUI();
-    else if (o.docked) {
-      const s = this.cw.stations[0];
+    if (o.docked) {
+      const s = this.dockStation ?? this.cw.stations[0];
       if (s) this.dockAt(s);
     }
     if (o.jumpTo !== undefined) this.startJump(o.jumpTo);
@@ -472,10 +472,12 @@ export class SystemScene implements Scene {
     if (!this.initialized) return;
     this.writeBack();
     const p = this.w.player;
-    p.x = this.player.x;
-    p.y = this.player.y;
-    p.hp = this.player.hpFracArray();
-    p.ammo = { ...this.player.ammo };
+    if (!this.dead && this.player.design === p.design) {
+      p.x = this.player.x;
+      p.y = this.player.y;
+      p.hp = this.player.hpFracArray();
+      p.ammo = { ...this.player.ammo };
+    }
     for (const wm of p.wingmen) {
       const s = this.cw.ships.find((x) => x.wingmanId === wm.id);
       if (s && !s.dead) wm.hp = s.hpFraction();
@@ -564,6 +566,7 @@ export class SystemScene implements Scene {
   private spawnWingmen(): void {
     const p = this.w.player;
     p.wingmen.forEach((wm, i) => {
+      if (this.cw.ships.some((x) => x.wingmanId === wm.id && !x.dead)) return;
       const d = this.w.design(wm.faction, wm.cls, wm.v);
       const s = new Ship(d, 0, wm.name, d.modules.map(() => Math.max(0.25, wm.hp)));
       s.wingmanId = wm.id;
@@ -829,7 +832,31 @@ export class SystemScene implements Scene {
       this.player.vx = 60;
     }
     this.player.invuln = 2;
+    this.spawnWingmen();
+    this.spawnEscorts();
     void p;
+  }
+
+  /** Escort freighters for missions accepted while docked here. */
+  private spawnEscorts(): void {
+    const w = this.w;
+    for (const m of w.player.missions) {
+      if (m.status !== 'active' || m.type !== 'escort' || m.origin !== this.sysId || (m.data.hp ?? 1) <= 0) continue;
+      if (this.cw.ships.some((x) => x.missionId === m.id && !x.dead)) continue;
+      m.data.started = true;
+      const d = w.design(m.faction > 0 ? m.faction : 1, 'freighter', 0);
+      const s = new Ship(d, m.faction > 0 ? m.faction : 1, 'Escorted Freighter', d.modules.map(() => m.data.hp ?? 1));
+      s.x = this.player.x - 200;
+      s.y = this.player.y + 150;
+      s.missionId = m.id;
+      s.ai = new AIController('escort', 'trader', { x: s.x, y: s.y }, 0.5);
+      s.ai.leader = this.player;
+      s.ai.offset = { x: -220, y: 160 };
+      s.ai.aggressive = false;
+      this.cw.add(s);
+      this.escort = s;
+      toast('The freighter is following you. Keep it alive until you dock at the destination.', 'info');
+    }
   }
 
   rebuildPlayerShip(): void {
@@ -1510,8 +1537,10 @@ export class SystemScene implements Scene {
     const starR = this.sys.stars[0].radius;
     const bin = this.sys.binarySep;
     this.sys.stars.forEach((star, i) => {
+      // binary companions orbit the barycentre on opposite sides, weighted by mass
+      const total = this.sys.stars.reduce((a, s2) => a + s2.mass, 0) || 1;
       const ang = this.t * 0.05 + i * Math.PI;
-      const off = bin > 0 ? bin / 2 * (i === 0 ? 1 : -1) * (star.mass > 0 ? 1 : 1) : 0;
+      const off = bin > 0 ? bin * (1 - star.mass / total) : 0;
       const sx0 = Math.cos(ang) * off, sy0 = Math.sin(ang) * off;
       items.push({ y: sy0, draw: () => {
         const [sx, sy] = cam.toScreen(sx0, sy0);
@@ -1584,10 +1613,18 @@ export class SystemScene implements Scene {
       const rot = (this.w.day * b.rotSpeed * 6) % (Math.PI * 2);
       const size = Math.min(320, Math.max(8, r * 2));
       const spr = this.game.planets.sprite(b, size, rot, (lx / l) * 0.85, (ly / l) * 0.85, this.t, inhabited);
-      const full = spr.width;
-      const scale = (r * 2) / (full / 1.24);
       if (b.rings) drawRings(g, sx, sy, r, cam.tilt, 'rgba(210,190,160,0.8)', false);
-      g.drawImage(spr, sx - (full * scale) / 2, sy - (full * scale) / 2, full * scale, full * scale);
+      if (spr) {
+        const full = spr.width;
+        const scale = (r * 2) / (full / 1.24);
+        g.drawImage(spr, sx - (full * scale) / 2, sy - (full * scale) / 2, full * scale, full * scale);
+      } else {
+        // placeholder while the surface map is generated
+        g.fillStyle = '#3a4a5a';
+        g.beginPath();
+        g.arc(sx, sy, r, 0, Math.PI * 2);
+        g.fill();
+      }
       if (b.rings) drawRings(g, sx, sy, r, cam.tilt, 'rgba(210,190,160,0.8)', true);
     }
     // labels (reference style: white name under the planet)

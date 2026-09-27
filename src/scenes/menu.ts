@@ -9,6 +9,7 @@ import { RNG, hash } from '../core/rng';
 import { personName } from '../core/names';
 import { generatePlanetTexture, PlanetTexture } from '../gen/planet';
 import { planetGL } from '../render/planetgl';
+import { requestPlanetTexture } from '../render/texworker';
 import { renderSphere } from '../render/planetcpu';
 import type { Body, PlanetType } from '../gen/system';
 import { PLANET_LABEL } from '../gen/system';
@@ -45,8 +46,14 @@ export class MenuScene implements Scene {
   enter(): void {
     audio.setMood('menu');
     setTimeout(() => {
-      this.tex = generatePlanetTexture(this.body, planetGL().ok ? 512 : 256);
+      this.tex = generatePlanetTexture(this.body, 256);
       if (planetGL().ok) planetGL().setTexture(this.tex);
+      const hi = planetGL().ok ? (this.game.settings.quality === 'high' ? 1024 : 512) : 0;
+      if (hi) requestPlanetTexture(this.body, hi).then((t) => {
+        if (this.game.scene !== this) return;
+        this.tex = t;
+        planetGL().setTexture(t);
+      });
     }, 30);
     this.buildMenu();
   }

@@ -387,6 +387,12 @@ interface PlanetEntry {
 export class PlanetSprites {
   private map = new Map<string, PlanetEntry>();
   private texRes: number;
+  /** New textures generated this frame (spreads the cost across frames). */
+  budget = 1;
+
+  has(body: Body, inhabited = 0): boolean {
+    return this.map.has(body.sysId + ':' + body.key + ':' + (inhabited > 0 ? 1 : 0));
+  }
 
   constructor(texRes = 128) {
     this.texRes = texRes;
@@ -407,8 +413,12 @@ export class PlanetSprites {
   }
 
   /** Sphere sprite for a body at a pixel size, lit from (lx, ly) screen direction. */
-  sprite(body: Body, sizePx: number, rot: number, lx: number, ly: number, time: number, inhabited = 0): HTMLCanvasElement {
+  sprite(body: Body, sizePx: number, rot: number, lx: number, ly: number, time: number, inhabited = 0): HTMLCanvasElement | null {
     const key = body.sysId + ':' + body.key + ':' + (inhabited > 0 ? 1 : 0);
+    if (!this.map.has(key)) {
+      if (this.budget <= 0) return null;
+      this.budget--;
+    }
     this.texture(body, inhabited);
     const e = this.map.get(key)!;
     e.last = time;
