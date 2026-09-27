@@ -1,0 +1,20 @@
+{
+  "name": "intergalactic-life",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Intergalactic Life - a 2.5D procedural space exploration, combat, trading, colonization and simulation game for the web.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview",
+    "build:docs": "npm run build && node -e \"require('fs').mkdirSync('docs',{recursive:true});require('fs').copyFileSync('dist/index.html','docs/index.html')\""
+  },
+  "devDependencies": {
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.6",
+    "vite-plugin-singlefile": "^2.3.3"
+  }
+}
