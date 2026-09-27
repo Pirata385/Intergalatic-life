@@ -157,7 +157,7 @@ function makeMission(w: World, rng: RNG, t: MissionType, id: string, sys: number
       rng.shuffle(own);
       const targets = own.slice(0, Math.min(3, own.length));
       return mk({ id, type: t, title: 'Patrol Route', desc: `Patrol ${targets.map((x) => w.sysData[x].name).join(', ')}. Report in each system.`,
-        faction: fid, origin: sys, target: targets[0], targets, goal: targets.length, reward: 900 + targets.length * 600, deadline: day + 25, rep: 4, merit: 20, military: !!f && f.kind === 'human' });
+        faction: fid, origin: sys, target: targets[0], targets, goal: targets.length, reward: 900 + targets.length * 600, deadline: day + 25, rep: 4, merit: 20, military: false });
     }
     case 'survey': {
       const cands = near.filter((s) => dist(s) < 80 && w.sysData[s].planets.length >= 2);

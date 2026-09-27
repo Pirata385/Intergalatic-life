@@ -9,7 +9,7 @@ import { playerWallet, advanceTime } from '../sim/simulation';
 import { clamp, shade, hexToRgb } from '../core/math';
 import { RNG, hash } from '../core/rng';
 import { audio } from '../audio/audio';
-import { openSettings } from '../ui/settingsui';
+import { openSettings, orientationButton } from '../ui/settingsui';
 import { openSaveLoad } from '../ui/saveui';
 import { saveColony } from '../save/save';
 import { PLANET_LABEL } from '../gen/system';
@@ -108,12 +108,18 @@ export class ColonyScene implements Scene {
 
   private center(): void {
     const s = this.c.size;
-    const z = this.zoom;
+    const W = this.game.width, H = this.game.height;
+    const portrait = H > W;
+    const fitW = W / (s * TW), fitH = (H * 0.7) / (s * TH);
+    this.zoom = clamp(portrait ? Math.min(fitW * 1.6, fitH) : Math.min(fitW, fitH) * 1.1, 0.35, 2.2);
     this.panX = 0;
-    this.panY = -(s * TH / 2) * z * 0.5 + this.game.height * 0.12;
-    const fit = Math.min(this.game.width / (s * TW), (this.game.height * 0.75) / (s * TH));
-    this.zoom = clamp(fit * 1.1, 0.35, 2.2);
-    this.panY = this.game.height * 0.05 - (s * TH / 2) * this.zoom * 0.35;
+    // put the colony centre in the middle of the free area between the top bar and build bar
+    const mid = portrait ? H * 0.47 : H * 0.5;
+    this.panY = mid - H * 0.18 - (s * TH / 2) * this.zoom;
+  }
+
+  onResize(): void {
+    this.center();
   }
 
   private pickTile(sx: number, sy: number): [number, number] | null {
@@ -238,6 +244,7 @@ export class ColonyScene implements Scene {
       h('button', { class: 'btn', onclick: () => { m.close(); openSaveLoad(this.game, 'save', 'colony'); } }, '💾 Save colony'),
       h('button', { class: 'btn', onclick: () => { m.close(); openSaveLoad(this.game, 'load', 'colony'); } }, '⤓ Load colony'),
       h('button', { class: 'btn', onclick: () => { m.close(); openSettings(this.game); } }, '⚙ Settings'),
+      orientationButton(this.game),
       h('button', { class: 'btn danger', onclick: () => { m.close(); this.leave(); } }, '⏏ Save & quit to title')));
   }
 
@@ -507,7 +514,7 @@ export class ColonyScene implements Scene {
     const [x, ty] = this.tileScreen(i, j);
     const y = ty + (TH / 2) * z; // tile centre
     const col = def.color;
-    const bh = def.height * 22 * z;
+    const bh = def.height * 30 * z;
     const building = progress < 1;
     if (building) g.globalAlpha *= 0.55;
     const prism = (w: number, d: number, hh: number, c: string) => {
@@ -522,17 +529,17 @@ export class ColonyScene implements Scene {
     };
     switch (def.shape) {
       case 'box':
-        prism(0.7, 0.7, bh, col);
+        prism(0.82, 0.82, bh, col);
         g.fillStyle = 'rgba(255,230,150,0.7)';
         for (let k = 0; k < 3; k++) g.fillRect(x - (TW / 2) * 0.5 * z + k * 7 * z, y - bh * 0.5, 3 * z, 3 * z);
         break;
       case 'tower':
-        prism(0.45, 0.45, bh, col);
+        prism(0.55, 0.55, bh, col);
         g.fillStyle = 'rgba(255,240,180,0.8)';
         for (let k = 1; k < 6; k++) g.fillRect(x - 8 * z, y - (bh * k) / 6, 5 * z, 2 * z);
         break;
       case 'dome': {
-        const r = (TW / 2) * 0.62 * z;
+        const r = (TW / 2) * 0.78 * z;
         g.fillStyle = 'rgba(0,0,0,0.25)';
         g.beginPath(); g.ellipse(x, y, r, r * 0.5, 0, 0, 6.28); g.fill();
         const grd = g.createRadialGradient(x - r * 0.3, y - bh * 0.7, 2, x, y - bh * 0.3, r * 1.2);
@@ -555,7 +562,7 @@ export class ColonyScene implements Scene {
         g.beginPath(); g.moveTo(x - 20 * z, y - 2 * z); g.lineTo(x + 20 * z, y - 2 * z); g.stroke();
         break;
       case 'turret':
-        prism(0.4, 0.4, bh * 0.6, '#5a5a62');
+        prism(0.5, 0.5, bh * 0.6, '#5a5a62');
         g.strokeStyle = '#c8d0da';
         g.lineWidth = 3 * z;
         g.beginPath(); g.moveTo(x, y - bh * 0.7); g.lineTo(x + 16 * z, y - bh * 0.9 - 6 * z); g.stroke();

@@ -1,7 +1,7 @@
 // Main menu: new campaign, continue, load, standalone Colony Mode, settings.
 import type { Game, Scene } from '../game';
 import { h, openModal, clear, toast } from '../ui/dom';
-import { openSettings, controlsHelp } from '../ui/settingsui';
+import { openSettings, controlsHelp, orientationButton } from '../ui/settingsui';
 import { openSaveLoad } from '../ui/saveui';
 import { latestCampaign, latestColony, loadColony } from '../save/save';
 import { World } from '../sim/world';
@@ -78,6 +78,7 @@ export class MenuScene implements Scene {
       colonyBtn,
       h('button', { class: 'btn', onclick: () => openSettings(game) }, '⚙ Settings'),
       h('button', { class: 'btn', onclick: () => this.howTo() }, '? How to Play'),
+      orientationButton(game, 'btn small'),
     );
     if (col) {
       colonyBtn.after(h('button', { class: 'btn', onclick: () => {

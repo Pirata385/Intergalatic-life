@@ -297,7 +297,7 @@ export function openStation(game: Game, scene: SystemScene, stn: StationEnt, onC
     add(body, h('h4', null, 'Hull frames (larger build grids)'), frames);
     // Premade ships
     if (fac && !w.hostile(0, fac.id)) {
-      const classes: ShipClass[] = ['scout', 'corvette', 'miner', 'freighter', 'frigate', 'destroyer'];
+      const classes: ShipClass[] = ['scout', 'corvette', 'miner', 'freighter', 'colony', 'frigate', 'destroyer'];
       if (fac.tech >= 3) classes.push('cruiser');
       const list = h('div', { class: 'grid2' });
       for (const cls of classes) {
@@ -314,7 +314,7 @@ export function openStation(game: Game, scene: SystemScene, stn: StationEnt, onC
           h('button', { class: `btn small ${p.credits + trade < price ? 'disabled' : ''}`, onclick: () => confirmDialog('Buy ship', `Buy this ${CLASS_LABEL[cls]} for ${fmtCr(price)}? Your current ship is traded in for ${fmtCr(trade)} (spare modules and cargo are kept).`, () => {
             p.credits += trade - price;
             const nd = cloneDesign(d);
-            nd.cls = 'custom';
+            // factory hulls come fully crewed; custom refits must provide crew quarters
             nd.key = 'custom_' + Date.now().toString(36);
             nd.name = `${CLASS_LABEL[cls]} ${nd.name.split(' ')[0]}`;
             nd.frame = FRAMES.find((f) => f.w >= nd.w && f.h >= nd.h)?.id ?? 'capital';

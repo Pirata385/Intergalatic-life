@@ -29,7 +29,7 @@ import { changeRep, addXp, addMerit, cargoUsed, playerStats } from '../player/pl
 import { missionsOnDock, missionsOnEnter, missionsOnScan, missionsOnFleetDestroyed, completeMission, abandonMission } from '../sim/missions';
 import { openStation } from '../ui/station';
 import { openJournal } from '../ui/journal';
-import { openSettings } from '../ui/settingsui';
+import { openSettings, orientationButton } from '../ui/settingsui';
 import { openSaveLoad } from '../ui/saveui';
 import { bus } from '../core/events';
 import { starterDesign } from '../ship/shipgen';
@@ -1036,6 +1036,7 @@ export class SystemScene implements Scene {
       h('button', { class: 'btn', onclick: () => { m.close(); openSaveLoad(game, 'save'); } }, '💾 Save game'),
       h('button', { class: 'btn', onclick: () => { m.close(); openSaveLoad(game, 'load'); } }, '⤓ Load game'),
       h('button', { class: 'btn', onclick: () => { m.close(); openSettings(game); } }, '⚙ Settings'),
+      orientationButton(game),
       h('button', { class: 'btn', onclick: () => { m.close(); openJournal(game, 'Pilot'); } }, '⭐ Pilot & skills'),
       h('button', { class: 'btn', onclick: () => { m.close(); openJournal(game, 'Factions'); } }, '⚑ Factions'),
       h('button', { class: 'btn', onclick: () => { m.close(); openJournal(game, 'Colonies'); } }, '⌂ Colonies'),
@@ -1099,6 +1100,11 @@ export class SystemScene implements Scene {
       if (dist(s.x, s.y, o.x, o.y) < 350) acts.push({ label: o.kind === 'anomaly' ? 'Study anomaly' : o.kind === 'pod' ? 'Recover pod' : 'Salvage', fn: () => this.useObject(o) });
     }
     if (route && route.length > 1 && route[0] === this.sysId && !this.jump) acts.push({ label: `Jump → ${w.sysData[route[1]].name}`, fn: () => this.startJump(route[1]) });
+    if (this.sel?.kind === 'ship') {
+      const t = this.sel.ship;
+      const f = w.factions[t.faction];
+      if (f.kind === 'pirate' && this.cw.isHostile(s, t) && !t.dead && dist(s.x, s.y, t.x, t.y) < 3000) acts.push({ label: 'Hail pirates', fn: () => this.hailPirates(t) });
+    }
     if (this.sel && this.sel.kind !== 'ship' && !this.autopilot) {
       const [x, y] = this.selPos();
       if (dist(s.x, s.y, x, y) > 900) acts.push({ label: 'Autopilot', fn: () => this.setAutopilot() });
@@ -1132,6 +1138,38 @@ export class SystemScene implements Scene {
   private toPlanet(b: Body): void {
     this.syncAll();
     this.game.go('planet', { body: b });
+  }
+
+  /** Negotiate with pirates: pay tribute in cargo or credits to be left alone. */
+  private hailPirates(t: Ship): void {
+    const w = this.w;
+    const p = w.player;
+    const group = this.cw.ships.filter((x) => !x.dead && x.faction === t.faction && dist(x.x, x.y, t.x, t.y) < 3000);
+    const threat = group.reduce((a, x) => a + x.base.strength, 0);
+    const demand = Math.round(300 + threat / 4);
+    const cargoVal = p.cargo.reduce((a, q, i) => a + q * COMMODITIES[i].base, 0);
+    const release = () => {
+      for (const x of group) {
+        if (x.ai) {
+          x.ai.mode = 'leave';
+          x.ai.aggressive = false;
+        }
+        x.target = null;
+        this.cw.aggro.get(x.id)?.delete(0);
+      }
+      toast(`${w.factions[t.faction].name}: "Pleasure doing business, captain."`, 'info', 3500);
+    };
+    const m = openModal(`Hail — ${t.name}`, [
+      h('p', null, `"Your cargo or your life, captain. ${demand.toLocaleString()} credits and we let you go."`),
+      h('div', { class: 'col' },
+        h('button', { class: `btn ${p.credits < demand ? 'disabled' : 'primary'}`, onclick: () => { p.credits -= demand; m.close(); release(); } }, `Pay ${fmtCr(demand)}`),
+        cargoVal > demand * 0.8 ? h('button', { class: 'btn', onclick: () => {
+          p.cargo = p.cargo.map(() => 0);
+          m.close();
+          release();
+        } }, `Hand over all cargo (worth ~${fmtCr(cargoVal)})`) : null,
+        h('button', { class: 'btn danger', onclick: () => { m.close(); toast('"Then you die!"', 'bad'); } }, 'Refuse and fight')),
+    ]);
   }
 
   private startScan(b: Body): void {

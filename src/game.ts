@@ -74,6 +74,20 @@ export class Game {
       if (document.hidden) this.autosave();
     });
     window.addEventListener('beforeunload', () => this.autosave());
+    // Map the browser / Android back button to the in-game back action.
+    try {
+      history.pushState({ igl: 1 }, '');
+      window.addEventListener('popstate', () => {
+        this.handleBack();
+        try {
+          history.pushState({ igl: 1 }, '');
+        } catch {
+          /* ignore */
+        }
+      });
+    } catch {
+      /* history API unavailable (sandboxed frame) */
+    }
     bus.on('toast', (p: { text: string; kind?: 'good' | 'bad' | 'info' }) => toast(p.text, p.kind ?? 'info'));
     bus.on('sfx', (name: string) => audio.play(name, 0.5));
     bus.on('news', (n: { kind: string; text: string }) => {

@@ -84,3 +84,19 @@ export function controlsHelp(): HTMLElement {
       'Drag (maps)', 'Pan'),
   );
 }
+
+const ORIENT_LABEL: Record<string, string> = { auto: '📱 Screen: Auto', portrait: '📱 Screen: Portrait', landscape: '📱 Screen: Landscape' };
+
+/** Button that cycles the screen orientation preference (auto → portrait → landscape). */
+export function orientationButton(game: Game, cls = 'btn'): HTMLElement {
+  const btn = h('button', { class: cls, title: 'Switch between portrait and landscape play' }, ORIENT_LABEL[game.settings.orientation]);
+  btn.addEventListener('click', () => {
+    const order = ['auto', 'portrait', 'landscape'] as const;
+    const i = order.indexOf(game.settings.orientation);
+    game.settings.orientation = order[(i + 1) % order.length];
+    game.applySettings();
+    if (game.settings.orientation !== 'auto') game.requestFullscreenOrientation();
+    btn.textContent = ORIENT_LABEL[game.settings.orientation];
+  });
+  return btn;
+}
